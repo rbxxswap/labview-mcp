@@ -1017,6 +1017,150 @@ async def labview_backend_info() -> str:
 
 
 # ===========================================================================
+# TOOL: labview_probe_vi_catalog
+# ===========================================================================
+
+@mcp.tool(
+    name="labview_probe_vi_catalog",
+    annotations={"title": "Probe LabVIEW VI Catalog",
+                 "readOnlyHint": True, "destructiveHint": False,
+                 "idempotentHint": True, "openWorldHint": False}
+)
+async def labview_probe_vi_catalog() -> str:
+    """
+    Scan the built-in VI path catalog and report which library VIs exist on
+    this LabVIEW installation. Use this before labview_build_block_diagram
+    to verify which nodes are available and what paths they resolved to.
+    Only available with the COM backend (Windows + VI Scripting).
+
+    Returns:
+        str: JSON mapping logical VI names to resolved paths (or "NOT FOUND").
+
+    Examples:
+        - "Which VISA VIs are available in my LabVIEW installation?"
+    """
+    b = _lv()
+    if not hasattr(b, "probe_vi_catalog"):
+        return _j({"error": "Only available with the COM backend."})
+    try:
+        return _j(b.probe_vi_catalog())
+    except Exception as exc:
+        return _err(exc)
+
+
+# ===========================================================================
+# TOOL: labview_build_block_diagram
+# ===========================================================================
+
+class BDNodeInput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    id: str = Field(..., description=(
+        "Local identifier used to reference this node in wire specs."
+    ))
+    path: str = Field(..., description=(
+        "Logical catalog name (e.g. 'VISA Write'), a '<vilib>/...' path, "
+        "or an absolute path to a VI. For structures use the class name."
+    ))
+    path_aliases: Optional[List[str]] = Field(
+        default=None,
+        description="Extra path variants to try if 'path' is not found."
+    )
+    is_structure: bool = Field(
+        default=False,
+        description="True for While Loop, For Loop, Case Structure, etc."
+    )
+    x: Optional[int] = Field(default=None, description="X position.")
+    y: Optional[int] = Field(default=None, description="Y position.")
+    width:  Optional[int] = Field(default=None, description="Width  (structures only).")
+    height: Optional[int] = Field(default=None, description="Height (structures only).")
+
+
+class BDWireInput(BaseModel):
+    src: str = Field(..., description=(
+        "'node_id.terminal_name'  OR  'ctrl:ControlName' / 'ind:IndicatorName'."
+    ))
+    dst: str = Field(..., description="Same format as src.")
+
+
+class BuildBDInput(_Base):
+    vi_path: str = Field(..., description=(
+        "Absolute path to the VI whose block diagram should be modified. "
+        "The VI must already exist (create it first with labview_generate_vi_script)."
+    ))
+    nodes: List[BDNodeInput] = Field(
+        ..., description="Ordered list of nodes to place on the block diagram."
+    )
+    wires: Optional[List[BDWireInput]] = Field(
+        default=None, description="Connections between node terminals."
+    )
+    script_only: bool = Field(
+        default=False,
+        description=(
+            "If true, only return the Python builder script without live execution. "
+            "Useful when VI Scripting is not yet enabled."
+        )
+    )
+
+
+@mcp.tool(
+    name="labview_build_block_diagram",
+    annotations={"title": "Build LabVIEW Block Diagram",
+                 "readOnlyHint": False, "destructiveHint": False,
+                 "idempotentHint": False, "openWorldHint": False}
+)
+async def labview_build_block_diagram(params: BuildBDInput) -> str:
+    """
+    Place function/subVI nodes and wires on a VI's block diagram using
+    LabVIEW VI Scripting via the COM backend.
+
+    Path resolution is version-aware: logical names like 'VISA Write' are
+    looked up in a built-in catalog with fallback paths for LabVIEW 2015-2024.
+    Run labview_probe_vi_catalog first to see what resolves on this install.
+
+    Always returns a standalone Python builder script ('script' key) that
+    performs the same operations — run it manually if live COM execution fails.
+
+    Requirements:
+        COM backend (Windows), VI Scripting enabled:
+        Tools -> Options -> VI Server -> VI Scripting
+
+    Args:
+        params (BuildBDInput):
+            - vi_path: path to existing VI
+            - nodes: list of {id, path, [x, y, width, height, is_structure]}
+            - wires: list of {src, dst} using 'node_id.terminal' notation
+            - script_only: skip live execution, only return Python script
+
+    Returns:
+        str: JSON with placed nodes, wire results, live_execution flag,
+             and always a 'script' key with the standalone Python script.
+
+    Examples:
+        - "Add VISA Write and VISA Read nodes to C:/Projects/Comm.vi"
+        - "Build the block diagram for my serial communication VI"
+        - "Place a While Loop with VISA nodes for Consult protocol"
+    """
+    b = _lv()
+    if not hasattr(b, "build_block_diagram"):
+        return _j({
+            "error": "labview_build_block_diagram requires the COM backend.",
+            "hint": "Set LABVIEW_BACKEND=com and ensure pywin32 is installed."
+        })
+    try:
+        nodes_raw = [n.model_dump(exclude_none=True) for n in params.nodes]
+        wires_raw = [w.model_dump() for w in params.wires] if params.wires else []
+        result = b.build_block_diagram(
+            vi_path=params.vi_path,
+            nodes=nodes_raw,
+            wires=wires_raw,
+            generate_script_only=params.script_only,
+        )
+        return _trunc(_j(result))
+    except Exception as exc:
+        return _err(exc)
+
+
+# ===========================================================================
 # Entry point
 # ===========================================================================
 
