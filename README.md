@@ -1,123 +1,240 @@
-# LabVIEW MCP Plugin
+# LabVIEW MCP Plugin for Claude
 
-Lets Claude control LabVIEW automatically — run VIs, read/write controls, execute tests,
-generate code, build executables, and read TDMS measurement data.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://python.org)
+[![LabVIEW Community](https://img.shields.io/badge/LabVIEW-Community%20Edition-green.svg)](https://www.ni.com/en/shop/labview/select-edition/labview-community-edition.html)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-Works with **LabVIEW Community Edition** and all paid editions on **Windows, macOS, and Linux**.
+**Let Claude control LabVIEW automatically** — run VIs, read/write front-panel controls, execute test suites, generate VI code, build executables, and read TDMS measurement data.
+
+> Works with **LabVIEW Community Edition** (free) and all paid editions.  
+> Runs on **Windows, macOS, and Linux**.
 
 ---
 
-## One-time setup (required)
+## What can Claude do with this plugin?
 
-Python 3.10+ must be installed. Then run **one** of the following depending on your OS and preferred backend:
+Once installed, you can ask Claude things like:
 
-### Windows (recommended: COM backend)
-```bat
-setup\install.bat
 ```
-This installs all Python dependencies including pywin32 for COM.
+Run C:/Projects/Acquire.vi with Sample Rate=1000 and Channels="Dev1/ai0:3"
 
-Or manually:
-```bash
-pip install "mcp[cli]>=1.3.0" pydantic nptdms pywin32 httpx --break-system-packages
-python -m pywin32_postinstall -install
-```
+Run all test VIs starting with "Test_" in my project and show me the results
 
-### macOS / Linux (CLI backend)
-```bash
-pip install "mcp[cli]>=1.3.0" pydantic nptdms --break-system-packages
-# LabVIEW 2018+ must be installed
+Create a new PID Controller VI with Kp, Ki, Kd controls and a Control Output indicator
+
+Build the "Release EXE" spec from C:/Projects/MyApp.lvproj
+
+Read the Voltage channel from the DAQ group in C:/Data/run01.tdms
+
+Check LabVIEW connection status and which backend is active
 ```
 
-After installing, **restart Claude Desktop**.
+Claude picks the right tools automatically — you describe what you want in plain language.
 
 ---
 
 ## How it works
 
-Claude uses 16 MCP tools to control LabVIEW. The server picks the best available interface automatically:
+The plugin starts a local Python server that connects to LabVIEW through one of four interfaces:
 
-| Backend | Platforms | What it needs |
-|---|---|---|
-| **COM** | Windows only | pywin32 + LabVIEW installed |
-| **CLI** | Win/Mac/Linux | LabVIEW 2018+ `LabVIEWCLI` binary |
-| **HTTP** | Any | LabVIEW Web Service configured in project |
-| **File Bridge** | Any | `MCP_Bridge.vi` running in LabVIEW |
+| Backend | Platforms | Needs | Features |
+|---------|-----------|-------|----------|
+| **COM / ActiveX** | Windows | pywin32 + LabVIEW | Full — controls, scripting, abort |
+| **CLI** | Win / Mac / Linux | LabVIEW 2018+ | Run VIs, mass compile, build specs |
+| **HTTP Web Service** | Any | Web Service configured | Run VIs, full control I/O |
+| **File Bridge** | Any | Bridge VI running in LabVIEW | Full control I/O, any version |
 
-Override auto-selection: `LABVIEW_BACKEND=com|cli|http|file`
-
----
-
-## Example prompts
-
-```
-Check LabVIEW connection status.
-
-Which backend is active and what features does it support?
-
-List all VIs in C:/Projects/MyProject.
-
-Run C:/Projects/Acquire.vi with Sample Rate=1000 and Channels="Dev1/ai0:3".
-
-Read the 'Temperature' indicator from SensorRead.vi.
-
-Run all test VIs starting with 'Test_' in C:/Projects/Tests/ and give me the results.
-
-Build the 'Release EXE' spec from C:/Projects/MyApp.lvproj.
-
-Read the 'Voltage' channel from group 'DAQ' in C:/Data/run01.tdms.
-
-Create a new VI at C:/Projects/PID_Controller.vi with controls Kp (1.0), Ki (0.1), Kd (0.01)
-and an indicator 'Control Output'.
-```
+The server selects the best available backend automatically. You can override with `LABVIEW_BACKEND=com|cli|http|file`.
 
 ---
 
-## File Bridge setup (optional, for control I/O without COM)
+## Installation
 
-The File Bridge lets any backend read/write controls via JSON files shared with LabVIEW.
+### Step 1 — Install Python 3.10+
 
+Download from [python.org](https://python.org/downloads/) if not already installed.  
+**Windows:** check "Add Python to PATH" during installation.
+
+### Step 2 — Install the plugin
+
+Download `labview-mcp.plugin` from the [latest release](../../releases/latest) and open it in Claude Desktop.
+
+Or install the plugin directly inside Claude Desktop:  
+**Settings → Capabilities → Plugins → Install from file**
+
+### Step 3 — Install Python dependencies
+
+**Windows** — run the included script (double-click or from a terminal):
+```bat
+setup\install.bat
+```
+
+**macOS / Linux:**
 ```bash
-# Generate bridge VI or print implementation instructions:
-python server/bridge_vi_generator.py --instructions-only
-
-# On Windows with LabVIEW open (creates blank VI):
-python server/bridge_vi_generator.py --output C:/Projects/MCP_Bridge.vi
+pip3 install "mcp[cli]>=1.3.0" pydantic nptdms httpx --break-system-packages
 ```
 
-Open `MCP_Bridge.vi` in LabVIEW and leave it running.
+**Windows (manual):**
+```bash
+pip install "mcp[cli]>=1.3.0" pydantic nptdms pywin32 httpx --break-system-packages
+python -m pywin32_postinstall -install
+```
+
+### Step 4 — Restart Claude Desktop
+
+The plugin starts the LabVIEW server automatically in the background on next launch.
 
 ---
 
-## LabVIEW Web Services setup (HTTP backend)
+## Available Tools (16)
 
-1. In LabVIEW: right-click project → **New → Web Service** — name it `MCPService`
+### Status & Diagnostics
+| Tool | Description |
+|------|-------------|
+| `labview_get_status` | Connection status, LabVIEW version, active backend |
+| `labview_backend_info` | Feature matrix for all four backends |
+
+### VI Discovery
+| Tool | Description |
+|------|-------------|
+| `labview_list_vis` | List `.vi` files in a directory |
+| `labview_get_vi_info` | Name, description, execution state of a VI |
+
+### VI Execution
+| Tool | Description |
+|------|-------------|
+| `labview_run_vi` | Run a VI with optional inputs, optional wait |
+| `labview_abort_vi` | Stop a running VI |
+| `labview_get_control_value` | Read a front-panel control or indicator |
+| `labview_set_control_value` | Write a value to a front-panel control |
+
+### Testing
+| Tool | Description |
+|------|-------------|
+| `labview_run_test_vi` | Run a single test VI, collect pass/fail result |
+| `labview_run_test_suite` | Run all test VIs in a directory matching a prefix |
+
+### VI Management
+| Tool | Description |
+|------|-------------|
+| `labview_create_vi_from_template` | Copy a template VI to a new path |
+| `labview_save_vi` | Save or Save As |
+| `labview_mass_compile` | Compile all VIs in a directory tree |
+| `labview_build_spec` | Execute a build spec (EXE, installer) — CLI backend |
+| `labview_generate_vi_script` | Create a VI with controls/indicators via VI Scripting — COM backend |
+
+### Data
+| Tool | Description |
+|------|-------------|
+| `labview_read_tdms` | Read TDMS files — no LabVIEW connection needed |
+
+---
+
+## Backend Setup Details
+
+### COM backend (Windows — recommended)
+
+No extra configuration needed beyond the Python dependencies above.  
+LabVIEW must be installed and the same bitness as Python (both 64-bit recommended).
+
+VI Scripting (for `labview_generate_vi_script`):  
+Enable in LabVIEW: **Tools → Options → VI Server → VI Scripting**
+
+### CLI backend (macOS / Linux / multi-version Windows)
+
+LabVIEW 2018 or newer must be installed. `LabVIEWCLI` is auto-detected.  
+Override with: `LABVIEW_CLI_PATH=/path/to/labviewcli`
+
+### HTTP Web Service backend
+
+1. In LabVIEW: right-click project → **New → Web Service** → name it `MCPService`
 2. Add your VIs to the web service
 3. **Tools → Web Server → Configuration → Enable**
 4. Right-click the web service → **Deploy**
-5. Set `LABVIEW_BACKEND=http` (or let auto-detect find it)
+
+Set `LABVIEW_BACKEND=http` (or let auto-detection find it).
+
+### File Bridge backend (any platform, any LabVIEW version)
+
+The File Bridge lets LabVIEW and Claude exchange data through JSON files — no COM, no CLI, no network.
+
+Generate setup instructions:
+```bash
+python server/bridge_vi_generator.py --instructions-only
+```
+
+On Windows with LabVIEW open (creates a blank bridge VI):
+```bash
+python server/bridge_vi_generator.py --output C:/Projects/MCP_Bridge.vi
+```
+
+Open `MCP_Bridge.vi` in LabVIEW, implement the polling loop (instructions printed above), and leave it running.
 
 ---
 
-## Environment variables
+## Environment Variables
 
-See `skills/labview/references/environment-variables.md` for the full list.
-Key variables: `LABVIEW_BACKEND`, `LABVIEW_CLI_PATH`, `LABVIEW_HTTP_HOST`,
-`LABVIEW_HTTP_PORT`, `LABVIEW_BRIDGE_DIR`.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LABVIEW_BACKEND` | `auto` | `auto` \| `com` \| `cli` \| `http` \| `file` |
+| `LABVIEW_CLI_PATH` | auto-detect | Path to `LabVIEWCLI` binary |
+| `LABVIEW_HTTP_HOST` | `localhost` | LabVIEW web server host |
+| `LABVIEW_HTTP_PORT` | `8080` | LabVIEW web server port |
+| `LABVIEW_HTTP_SERVICE` | `MCPService` | Web service name |
+| `LABVIEW_HTTP_TOKEN` | _(empty)_ | Bearer token for HTTP auth |
+| `LABVIEW_BRIDGE_DIR` | `%TEMP%\labview_mcp_bridge` | File bridge directory |
+| `LABVIEW_BRIDGE_TIMEOUT` | `60` | Bridge response timeout in seconds |
+
+Set variables in the MCP config (`env` block in `.mcp.json`) or in your system environment.
 
 ---
 
-## Community Edition
+## LabVIEW Community Edition
 
-LabVIEW Community Edition fully supports this plugin:
-- ✅ COM/ActiveX (Windows)
-- ✅ LabVIEW CLI (LabVIEW 2020 CE)
-- ✅ VI Scripting — enable via **Tools → Options → VI Server → VI Scripting**
-- ✅ Web Services
-- ✅ TDMS read
+All features work with the free Community Edition:
+
+- ✅ COM / ActiveX (Windows)  
+- ✅ LabVIEW CLI (LabVIEW 2020 Community Edition)  
+- ✅ VI Scripting — enable in Tools → Options → VI Server  
+- ✅ Web Services  
+- ✅ TDMS read  
 
 ---
 
 ## Troubleshooting
 
-See `skills/labview/references/troubleshooting.md`.
+**`No LabVIEW backend is available`**  
+Install at least one: `pywin32` (COM), LabVIEW 2018+ (CLI), `httpx` (HTTP), or start `MCP_Bridge.vi` (File).
+
+**`Could not connect to LabVIEW via COM`**  
+Run `python -m pywin32_postinstall -install`.  
+Make sure Python and LabVIEW are both 64-bit.
+
+**`LabVIEWCLI executable not found`**  
+Set `LABVIEW_CLI_PATH` to the full path of the binary.
+
+**Control names not found**  
+Names are case-sensitive. Use `labview_get_vi_info` to list controls first.
+
+**HTTP backend returns 404**  
+Verify service name, that the VI is deployed, and the web server is running.
+
+**File Bridge times out**  
+Make sure `MCP_Bridge.vi` is running. Check `LABVIEW_BRIDGE_DIR` matches on both sides.
+
+---
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+- **Bug reports:** open a GitHub issue
+- **New backends or features:** open a pull request
+- **Tested with a specific LabVIEW version?** Let us know in Discussions
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
