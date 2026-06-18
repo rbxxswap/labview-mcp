@@ -1,0 +1,20 @@
+# LabVIEW MCP Server – Python dependencies
+#
+# Minimum install (COM backend, Windows):
+#   pip install mcp[cli] pywin32 nptdms --break-system-packages
+#   python -m pywin32_postinstall -install
+#
+# Full install (all backends):
+#   pip install -r requirements.txt --break-system-packages
+
+# ── Core (required) ────────────────────────────────────────────────────────
+mcp[cli]>=1.3.0       # FastMCP server framework + stdio transport
+pydantic>=2.0.0       # Input validation (also bundled with mcp)
+nptdms>=1.5.0         # TDMS file read (works on all platforms, no LabVIEW needed)
+
+# ── COM backend (Windows only) ─────────────────────────────────────────────
+pywin32>=306          # LabVIEW.Application COM/ActiveX interface
+                      # After install: python -m pywin32_postinstall -install
+
+# ── HTTP backend (all platforms) ───────────────────────────────────────────
+httpx>=0.27.0         # Async HTTP client for LabVIEW Web Services REST API

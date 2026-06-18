@@ -1,0 +1,10 @@
+{
+  "name": "labview-mcp",
+  "version": "0.1.0",
+  "description": "LabVIEW automation via MCP — run VIs, read/write controls, execute tests, generate code, and read TDMS data. Supports Community Edition and all paid editions on Windows, macOS, and Linux.",
+  "author": {
+    "name": "Andi"
+  },
+  "keywords": ["labview", "ni", "vi", "tdms", "test", "measurement"],
+  "mcpServers": "./.mcp.json"
+}

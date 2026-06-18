@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "labview": {
+      "command": "python",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/server.py"],
+      "env": {
+        "LABVIEW_BACKEND": "auto"
+      }
+    }
+  }
+}
